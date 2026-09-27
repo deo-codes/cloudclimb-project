@@ -229,7 +229,7 @@ The updated architecture includes:
 
 - Existing Application, Data/Backend, and Management subnets
 
-![CloudClimb Week 2 Application Compute Architecture](diagrams/week02-application-compute-architecture.png)
+![CloudClimb Week 2 Application Compute Architecture](diagrams/week02-application-compute-design.png)
 
 ### What I Learned
 
