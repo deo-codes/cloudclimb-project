@@ -84,3 +84,49 @@
 
 #### \---
 
+
+
+#### \### Week 1 Architecture
+
+#### 
+
+#### The Week 1 architecture established the network foundation before any application compute resources were deployed.
+
+#### 
+
+#### The architecture consisted of:
+
+#### 
+
+#### \- One Azure Resource Group
+
+#### \- One Azure Virtual Network
+
+#### \- Three segmented subnets
+
+#### \- Three Network Security Groups
+
+#### \- Azure system routing
+
+#### \- Reserved network capacity for future workloads
+
+#### 
+
+#### !\[Week 1 Network Architecture](diagrams/cloudclimb-week01-networkarc-design.png)
+
+#### 
+
+#### \### What I Learned
+
+#### 
+
+#### Week 1 helped me understand why cloud infrastructure should be designed before workloads are deployed.
+
+#### 
+
+#### I learned how CIDR ranges define network address space, how subnets can separate workloads into security boundaries, how NSGs provide network-level traffic controls, and how Azure system routing supports communication within a virtual network.
+
+#### 
+
+#### I also learned the importance of planning IP address ranges so that future resources can be added without creating overlapping address spaces or requiring unnecessary network redesign.
+
