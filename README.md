@@ -398,7 +398,7 @@ The objective was to build a repeatable infrastructure configuration, implement 
 
 ## Architecture Diagram
 
-![Week 4 — Terraform CI/CD Architecture](images/week4-terraform-cicd-architecture.png)
+![Week 4 — Terraform CI/CD Architecture](diagrams/week04-terraform-design.png)
 
 The architecture illustrates the development workflow, GitHub Actions CI/CD pipeline, Microsoft Entra ID authentication through OIDC, and the relationship to the existing Week 3 Azure infrastructure.
 
