@@ -385,3 +385,137 @@ Week 3 strengthened my understanding of how application services, containers, ma
 I learned to validate connectivity layer by layer—hostname resolution, TCP reachability, database authentication, application startup, and browser functionality—rather than assuming a successful deployment means the application is fully operational.
 
 I also practiced responding to a real deployment constraint. Instead of claiming the original private-network design was complete, I documented a temporary cross-region public-endpoint workaround and identified the security and migration work that remains. Finally, the authentication troubleshooting challenge reinforced the importance of log analysis, protected credentials, container recreation, and persistence testing.
+
+# Week 4 — Infrastructure as Code and CI/CD Automation
+
+## Project Overview
+
+During Week 4 of my CloudClimb Azure Cloud Infrastructure project, I focused on Infrastructure as Code (IaC), Terraform, GitHub Actions, and secure Azure authentication.
+
+The objective was to build a repeatable infrastructure configuration, implement automated validation and planning, and practice troubleshooting CI/CD pipeline failures.
+
+**Deployment status:** Terraform configurations were validated and planned successfully. No Azure infrastructure was deployed through Terraform during this week.
+
+## Architecture Diagram
+
+![Week 4 — Terraform CI/CD Architecture](images/week4-terraform-cicd-architecture.png)
+
+The architecture illustrates the development workflow, GitHub Actions CI/CD pipeline, Microsoft Entra ID authentication through OIDC, and the relationship to the existing Week 3 Azure infrastructure.
+
+The Week 4 Terraform configuration is a separate proposed infrastructure lab, not a deployment of the existing Week 3 resources.
+
+## Tools and Technologies
+
+- Terraform CLI
+- Microsoft Azure
+- Microsoft Entra ID
+- Azure Role-Based Access Control (RBAC)
+- Git and GitHub
+- GitHub Actions
+- Visual Studio Code
+- PowerShell
+- OpenID Connect (OIDC)
+
+## Terraform Infrastructure Configuration
+
+I created Terraform configuration files defining:
+
+- Azure Resource Group
+- Azure Virtual Network (`10.10.0.0/16`)
+- Application Subnet (`10.10.1.0/24`)
+- Database Subnet (`10.10.2.0/24`)
+- Management Subnet (`10.10.3.0/24`)
+- Database Network Security Group (NSG)
+- Security rules permitting PostgreSQL traffic on TCP port 5432 from the application subnet
+- Terraform outputs for infrastructure resource information
+
+The configuration was checked using:
+
+```bash
+terraform fmt -check
+terraform validate
+terraform plan
+```
+
+The plan reported **7 resources to add, 0 to change, and 0 to destroy**.
+
+This represented proposed infrastructure changes only.
+
+## GitHub Actions CI/CD Pipeline
+
+I configured a GitHub Actions workflow to automatically execute Terraform checks when a pull request is opened.
+
+The workflow performs:
+
+1. Repository checkout
+2. Terraform setup
+3. Terraform formatting verification
+4. Terraform initialization
+5. Terraform configuration validation
+6. Azure authentication using OIDC
+7. Terraform plan
+
+The pipeline can also be triggered manually through `workflow_dispatch`.
+
+## Secure Azure Authentication
+
+I configured a Microsoft Entra ID application registration and federated credentials to authenticate GitHub Actions with Azure.
+
+This included:
+
+- GitHub Actions OIDC authentication
+- Microsoft Entra ID app registration
+- Federated identity credentials
+- Azure service principal
+- Azure RBAC permissions
+- GitHub Actions variables for Azure identifiers
+
+OIDC enabled authentication without storing a long-lived Azure client secret in the GitHub repository.
+
+## Deployment Safety
+
+I created a separate manually triggered Terraform deployment workflow.
+
+For safety, the Terraform Apply step remains disabled.
+
+This prevents accidental infrastructure deployment and allows infrastructure plans to be reviewed before changes are approved.
+
+## Pipeline Troubleshooting Challenge
+
+During Task 23, I intentionally introduced a Terraform formatting issue to simulate a CI/CD pipeline failure.
+
+The GitHub Actions workflow failed during the Terraform Format step.
+
+I investigated the execution logs, identified the formatting issue in `main.tf`, and corrected it locally using Terraform formatting commands.
+
+After committing and pushing the correction, I confirmed that the GitHub Actions workflow passed successfully.
+
+The troubleshooting process was documented in `troubleshooting.md` in my Terraform repository.
+
+## GitHub Workflow and Change Management
+
+I practiced:
+
+- Creating feature branches
+- Committing infrastructure changes
+- Opening pull requests
+- Reviewing automated checks
+- Troubleshooting failed pipelines
+- Merging validated changes into the main branch
+- Documenting technical incidents
+
+## What I Learned
+
+Week 4 strengthened my understanding of Infrastructure as Code and the importance of validating changes before deployment.
+
+I learned how Terraform provides repeatable infrastructure configurations, how GitHub Actions automates validation, and how OIDC enables secure authentication between GitHub and Azure.
+
+I also gained practical experience troubleshooting pipeline failures and documenting root causes.
+
+Most importantly, I learned that successful cloud infrastructure engineering requires more than writing configurations. It requires planning, testing, security controls, change management, and clear technical documentation.
+
+## Terraform Source Code
+
+[View the CloudClimb Azure Terraform Repository](https://github.com/deo-codes/CloudClimb-Azure-Terraform)
+
+*Note: The source repository link will only be accessible to other users after its visibility is changed to public.*
