@@ -10,6 +10,12 @@ During Week 1, I designed and deployed the core Azure network foundation, includ
 
 During Week 2, I expanded the environment by deploying an Ubuntu Linux virtual machine into the Application Subnet and configuring secure SSH administration, network access controls, connectivity validation, troubleshooting, and Azure CLI management.
 
+During Week 3, I deployed the Memos application with Docker and connected it to a temporary Azure Database for PostgreSQL Flexible Server, documenting the cross-region public-endpoint workaround.
+
+During Week 4, I implemented Terraform infrastructure definitions and GitHub Actions CI/CD validation with Microsoft Entra ID OIDC authentication, without applying the proposed Terraform infrastructure.
+
+During Week 5, I configured Azure Monitor metrics, centralized Linux Syslog collection, Log Analytics queries, a CPU metric alert, and email notification testing, then disabled the alert and deallocated the VM.
+
 The long-term goal of the project is to build the infrastructure required to host the Memos application while applying Azure networking, identity, security, monitoring, and operational best practices.
 
 ---
@@ -23,6 +29,12 @@ The environment uses a three-tier network design inside an Azure Virtual Network
 * **Management Tier** — Reserved for administrative and management workloads.
 
 Separating these workloads into dedicated subnets provides clearer security boundaries and allows network access controls to be applied independently to each tier.
+
+### Complete Project Architecture — Weeks 1–5
+
+![CloudClimb Azure Infrastructure, Automation and Monitoring — Weeks 1–5](diagrams/cloudclimb-weeks01-05-architecture.png)
+
+This overview connects the Azure network and application infrastructure, Terraform and GitHub Actions workflow, and Week 5 monitoring and alerting. Individual weekly diagrams remain in their respective sections.
 
 ### Azure Environment
 
@@ -519,3 +531,265 @@ Most importantly, I learned that successful cloud infrastructure engineering req
 [View the CloudClimb Azure Terraform Repository](https://github.com/deo-codes/CloudClimb-Azure-Terraform)
 
 *Note: The source repository link will only be accessible to other users after its visibility is changed to public.*
+
+---
+
+## Week 5 — Monitoring, Logging & Alerting
+
+**Environment:** Development | **Region:** East US  
+**Status:** Monitoring lab implemented and tested; six KQL queries retrieved and documented; architecture diagram prepared. Repository image links and evidence paths require verification.
+
+> Before publication, verify that the linked diagram and KQL files are committed at the paths shown below, and review evidence for sensitive information.
+
+### 1. Overview
+
+Weeks 01–04 established network segmentation, Linux compute, the Memos application with PostgreSQL, and Terraform/GitHub Actions workflows. Week 05 adds the operational layer: **metrics, centralized logs, alerts, notification routing, and incident troubleshooting**.
+
+The goal is to answer three operational questions:
+
+- **Metrics:** How is the system performing?
+- **Logs:** What happened, and when?
+- **Alerts:** When should an engineer investigate?
+
+### 2. Architecture
+
+![Week 5 — Azure Monitoring, Logging and Alerting](diagrams/week05-monitoring-alerts.png)
+
+
+```text
+User / browser
+     |
+     v
+Memos web application (TCP 5230)
+     |
+     v
+Ubuntu VM: vm-app-dev-eastus
+     |                        \
+     |                         \-- Docker container / application logs
+     v
+PostgreSQL database
+
+Ubuntu VM -- Azure Monitor Agent --> Data Collection Rule
+                                      |
+                                      v
+                         Log Analytics Workspace
+                                      |
+                                      v
+                             KQL investigations
+
+Ubuntu VM -- Percentage CPU metric --> Azure Monitor metric alert
+                                           |
+                                           v
+                                        Action Group
+                                           |
+                                           v
+                                     Verified email recipient
+```
+
+**Note:** The CPU metric alert and the Log Analytics/KQL workflow are distinct monitoring paths. The alert created in this lab is metric-based, not a KQL log alert. Application health was checked manually; no automated Memos availability alert was demonstrated.
+
+### 3. Azure Resources
+
+| Component | Resource / configuration | Purpose |
+|---|---|---|
+| Resource group | `rg-cloudclimb-dev-eastus` | Organize project resources |
+| Linux VM | `vm-app-dev-eastus` | Hosts Dockerized Memos |
+| Memos | TCP `5230` | Application health-check target |
+| Log Analytics workspace | `cloudclimb-project01-law` | Centralized operational log queries |
+| Data Collection Rule | `dcr-cloudclimb-linux-logs` | Routes selected Linux Syslog to workspace |
+| Azure Monitor Agent | Installed on Linux VM | Forwards configured telemetry |
+| Metric alert | `alert-cloudclimb-vm-high-cpu` | Monitors high VM CPU usage |
+| Action group | `ag-cloudclimb-cpu-alerts` | Routes alert notifications to email |
+
+#### 4. Monitoring Implementation
+
+##### 4.1 Review infrastructure metrics
+
+Explored Azure Monitor and the VM's monitoring interface, including **Percentage CPU**. CPU metrics help detect resource pressure but must be correlated with application behavior, memory, disk, network, and logs before diagnosing an incident.
+
+##### 4.2 Centralized Linux logging
+
+Created the Log Analytics workspace and configured the Azure Monitor Agent with a Data Collection Rule to collect Linux Syslog events, including authentication-related `authpriv` messages.
+
+Validation steps included:
+
+1. Confirm the VM was running and the Azure Monitor Agent was installed.
+2. Check the DCR's VM association and data-flow validation.
+3. Confirm rsyslog was running and the AMA forwarding configuration existed.
+4. Query Log Analytics to confirm events from `vm-app-dev-eastus` were arriving.
+5. Generate a controlled synthetic authentication-facility test event and find it in the workspace.
+
+The DCR validation ultimately showed **no issues**, and Log Analytics returned Syslog records from the VM.
+
+##### 4.3 Synthetic Syslog ingestion test
+
+On the Linux VM:
+
+```bash
+logger -p authpriv.notice -t sshd "CloudClimb-Week5-SSH-Monitoring-Test"
+sudo grep -F "CloudClimb-Week5-SSH-Monitoring-Test" /var/log/auth.log
+```
+
+In Log Analytics:
+
+```kusto
+Syslog
+| where TimeGenerated > ago(2h)
+| where Computer == "vm-app-dev-eastus"
+| where SyslogMessage contains "CloudClimb-Week5-SSH-Monitoring-Test"
+| project TimeGenerated, Computer, Facility, SeverityLevel, ProcessName, SyslogMessage
+| order by TimeGenerated desc
+```
+
+**Result:** The synthetic `sshd`/`authpriv` test message appeared in Log Analytics. This validates collection and ingestion of the test event; it does **not** prove an actual SSH brute-force attempt or a security detection rule.
+
+##### 4.4 Saved KQL queries
+
+The six original KQL queries were retrieved from Azure Log Analytics query history and documented with their purpose and full code:
+
+**[View all six Week 5 KQL queries](docs/week05/kql-queries.md)**
+
+The queries cover authentication Syslog events, event counts by computer, synthetic SSH test verification, authentication summaries, SSH service activity, and failed-login messages. The synthetic ingestion validation query above is reproduced from lab evidence.
+
+Suggested evidence: screenshots of the query list, Syslog event results, and DCR data-flow validation.
+
+### 5. Memos Application Health Check
+
+The application runs as a Docker container named `memos` and listens on TCP port `5230`.
+
+```bash
+sudo docker ps
+curl -I http://localhost:5230
+sudo docker logs --tail 30 memos
+sudo ss -tulpn | grep 5230
+```
+
+**Observed results:**
+
+- The Memos container was running.
+- The local HTTP request returned `HTTP/1.1 200 OK`.
+- The service was listening on port `5230` through Docker's published port.
+- The Memos sign-in page loaded in a browser.
+- Container logs showed successful startup and normal API activity; a refresh-token authentication message was also observed and should not be confused with proof of an application outage.
+
+**Security consideration:** The lab's network security group included an inbound TCP `5230` rule with source `Any`. This enabled the reachability test but is too broad for a production deployment. A production design should restrict ingress and preferably expose the application through HTTPS, controlled reverse proxy/application gateway, and appropriate identity/access controls.
+
+### 6. Azure CPU Metric Alert
+
+| Setting | Configuration |
+|---|---|
+| Alert name | `alert-cloudclimb-vm-high-cpu` |
+| Target | `vm-app-dev-eastus` |
+| Signal | Percentage CPU |
+| Threshold type | Static |
+| Aggregation | Average |
+| Operator | Greater than |
+| Threshold | 80% |
+| Lookback | 5 minutes |
+| Evaluation frequency | 1 minute |
+| Severity | 2 — Warning |
+| Action group | `ag-cloudclimb-cpu-alerts` |
+| Final state | **Disabled** after testing |
+
+**Why 80%?** Sustained high CPU can indicate workload pressure or a process consuming excessive resources. The five-minute lookback helps avoid responding to very brief spikes. The threshold is a learning baseline, not a production-tuned SLO.
+
+#### Notification validation
+
+Created an email notification in the action group and verified the recipient. Used the Azure portal's **Test action group** feature with a sample **static-threshold metric alert**. A delivery-confirmation email arrived.
+
+**Important limitation:** The email confirms the **action-group notification path** works. It does **not** demonstrate that the real VM crossed 80% CPU or that the live alert rule fired naturally.
+
+After the test, the CPU alert was disabled and its configuration preserved.
+
+### 7. Troubleshooting Runbook — “Memos Is Down”
+
+**Scenario:** A user reports that the Memos page is unavailable.
+
+| Step | What to check | Example method |
+|---|---|---|
+| 1 | VM power and health | Azure VM Overview / Azure Monitor |
+| 2 | Application container status | `sudo docker ps` |
+| 3 | Local HTTP response | `curl -I http://localhost:5230` |
+| 4 | Application logs | `sudo docker logs --tail 100 memos` |
+| 5 | Port listener | `sudo ss -tulpn \| grep 5230` |
+| 6 | NSG inbound rules and source restrictions | Azure VM Network settings |
+| 7 | PostgreSQL reachability | `nc -vz <DATABASE_FQDN> 5432` (replace placeholder) |
+| 8 | VM resources and OS logs | `df -h`, `free -m`, `top`, Log Analytics |
+
+**Decision logic:** If the local HTTP request succeeds but remote access fails, investigate NSGs, routes, public endpoint exposure, and host firewall before restarting the application. If the local request fails, inspect container state, logs, dependencies, and database connectivity. Avoid making unreviewed changes before collecting evidence.
+
+### 8. Troubleshooting Findings
+
+- **No log data initially:** Investigated VM state, AMA installation, DCR association, heartbeat/data flow, and rsyslog forwarding. Once configured and the VM was running, Syslog records appeared in the workspace.
+- **No SSH failures in initial queries:** Auth-related logs existed, but no matching failed-password SSH records were observed in the queried window. A controlled `logger` event was used to verify ingestion without claiming a real attack.
+- **Memos health:** Verified Docker, HTTP response, published port, browser sign-in page, and container logs rather than assuming an open port alone proved application health.
+- **Action group verification:** Distinguished the welcome/verification email from the later sample-alert test email.
+
+### 9. Cost Management and Lab Shutdown
+
+- Configured a Log Analytics **daily ingestion cap of `0.023 GB/day`** (approximately 23 MB/day). This is a spending guardrail, **not an absolute cost ceiling**.
+- The Azure portal displayed an **estimated `$0.10 USD/month`** for the configured single-series CPU metric alert at creation time. This is a portal estimate, not a statement of the entire environment's cost.
+- Disabled the CPU metric alert after testing.
+- Deallocated `vm-app-dev-eastus`; Azure showed **`Stopped (deallocated)`**.
+- Deallocation stops VM compute charges, but managed disks, public IP resources, Log Analytics, database services, and other resources may still incur charges.
+
+### 10. Evidence Checklist
+
+Add repository-relative links once screenshots are organized; do not publish account IDs, email addresses, credentials, secrets, or sensitive endpoint details.
+
+- [ ] Azure Monitor CPU metric screenshot
+- [ ] Log Analytics workspace and daily cap screenshot
+- [ ] DCR/AMA data-flow status — no issues
+- [ ] Syslog records arriving in Log Analytics
+- [ ] Synthetic SSH Syslog test visible in KQL
+- [ ] Six saved KQL queries (exact query text)
+- [ ] Memos container, HTTP 200, and browser reachability
+- [ ] CPU metric alert configuration
+- [ ] Action group verified email and sample test delivery
+- [ ] CPU alert rule disabled
+- [ ] VM stopped (deallocated): `week5-vm-deallocated.png`
+- [ ] Updated Week 05 architecture diagram
+
+### 11. Terraform and CI/CD
+
+Week 04 established a GitHub Actions workflow using Terraform validation and Azure authentication through OIDC. Week 05 monitoring resources were configured through the Azure portal during this lab. **Do not claim these monitoring resources were deployed with Terraform unless that work is completed and verified.**
+
+**Potential follow-up:** Convert the workspace, DCR/associations, metric alert, and action group into reviewed Terraform resources on a feature branch; run `terraform fmt`, `terraform validate`, and `terraform plan` through GitHub Actions; inspect the plan before applying.
+
+### 12. Production Improvements
+
+1. Restrict Memos ingress and terminate TLS at an approved HTTPS endpoint.
+2. Add automated application availability monitoring; local HTTP checks were manual in this lab.
+3. Establish alert tuning, notification ownership, escalation, and incident runbooks.
+4. Add dashboards and application/database-specific telemetry.
+5. Review log retention, ingestion costs, access controls, and sensitive data exposure.
+6. Manage monitoring infrastructure with Terraform and review changes through pull requests.
+
+### 13. Lessons Learned
+
+- **Deployment is not the end of cloud engineering.** Monitoring is needed to operate a system after launch.
+- **Metrics and logs answer different questions.** CPU indicates pressure; logs help explain what occurred.
+- **A notification test is not the same as a live alert firing.** Evidence should state exactly what was validated.
+- **Troubleshooting works best layer by layer.** VM → container → local HTTP → network → database → logs.
+- **Cost control is part of operations.** Disable unused alerting and deallocate compute when lab work is finished.
+
+### 14. Completion Status
+
+| Deliverable | Status |
+|---|---|
+| VM metrics reviewed | Completed |
+| Log Analytics workspace | Completed |
+| Azure Monitor Agent / Data Collection Rule | Completed |
+| Syslog ingestion verified | Completed |
+| Memos reachability checked | Completed |
+| CPU metric alert created | Completed; now disabled |
+| Action group email notification tested | Completed (sample alert) |
+| VM deallocated | Completed |
+| Six exact KQL queries in repository | Pending documentation |
+| Architecture diagram update | Pending |
+| Week 05 README publication | Pending |
+| Monitoring resources managed by Terraform | Optional follow-up; not verified |
+
+---
+
+**Project 01 lifecycle:** Design → Deploy → Secure → Automate → Monitor → Troubleshoot.
