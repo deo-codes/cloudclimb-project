@@ -773,22 +773,6 @@ Week 04 established a GitHub Actions workflow using Terraform validation and Azu
 - **Troubleshooting works best layer by layer.** VM → container → local HTTP → network → database → logs.
 - **Cost control is part of operations.** Disable unused alerting and deallocate compute when lab work is finished.
 
-### 14. Completion Status
-
-| Deliverable | Status |
-|---|---|
-| VM metrics reviewed | Completed |
-| Log Analytics workspace | Completed |
-| Azure Monitor Agent / Data Collection Rule | Completed |
-| Syslog ingestion verified | Completed |
-| Memos reachability checked | Completed |
-| CPU metric alert created | Completed; now disabled |
-| Action group email notification tested | Completed (sample alert) |
-| VM deallocated | Completed |
-| Six exact KQL queries in repository | Pending documentation |
-| Architecture diagram update | Pending |
-| Week 05 README publication | Pending |
-| Monitoring resources managed by Terraform | Optional follow-up; not verified |
 
 ---
 
